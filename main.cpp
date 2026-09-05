@@ -3,6 +3,7 @@
 #include <QLabel>
 #include <QPixmap>
 #include <QPainter>
+#include <LayerShellQt/Window>
 //#include <QDebug>
 
 int main(int argc, char *argv[]){
@@ -18,10 +19,17 @@ int main(int argc, char *argv[]){
 		  window.setWindowFlags(
 								Qt::FramelessWindowHint |
 							  	Qt::Tool |
-								Qt::WindowStaysOnTopHint |
 								Qt::WindowDoesNotAcceptFocus |
 								Qt::WindowTransparentForInput
 								);
+		
+		  window.winId();
+
+		  auto *layerWindow = LayerShellQt::Window::get(window.windowHandle());
+
+		  layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
+		  layerWindow->setExclusiveZone(0);
+
 
 		  QLabel image(&window);
 
