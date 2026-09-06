@@ -20,3 +20,8 @@ Then Type:
 ./install.sh
 
 This runs the executable and moves the dbdoverlay.desktop to /home/.local/share/applications/[dbdoverlay.desktop]
+
+after that command run 'source ~/.bashrc' in the terminals you want to run the overlay in or
+open a new terminal.
+
+Then run 'dbdoverlay' commands anywhere on any terminal

@@ -141,7 +141,7 @@ int main(int argc, char *argv[]){
 
 		  layerWindow->setMargins(QMargins(10, 10, 10, 10));
 
-		  QDir mapsDir("maps");
+		  QDir mapsDir(QDir::homePath() + "/.local/share/dbdoverlay/maps");
 
 		  MapLabel image(&window, mapsDir);
 
