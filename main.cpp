@@ -7,6 +7,8 @@
 #include <QMargins>
 #include <QDir>
 #include <QEvent>
+#include <QFile>
+#include <QTextStream>
 //#include <QSocketNotifier>
 //#include <QLocalServer>
 //#include <QLocalSocket>
@@ -34,12 +36,12 @@ const char *socketPath = "/tmp/dbdoverlay.sock";
 std::string requestedMap;
 std::mutex mapMutex;
 
-bool setMap(QLabel &image, const QDir &mapsDir, const QString &mapName);
+bool setMap(QLabel &image, const QDir &mapsDir, const QString &mapName, double opacity);
 
 class MapLabel : public QLabel{
 		  public:
-					 MapLabel(QWidget *parent, const QDir &mapsDir)
-								: QLabel(parent), mapsDir(mapsDir){}
+					 MapLabel(QWidget *parent, const QDir &mapsDir, double opacity)
+								: QLabel(parent), mapsDir(mapsDir), opacity(opacity){}
 		 protected:
 					 bool event(QEvent *event) override{
 								if (event->type() == MapChangeEvent::Type) {
@@ -54,7 +56,7 @@ class MapLabel : public QLabel{
 										  }
 
 										  if (!mapName.isEmpty()) {
-													 setMap(*this, mapsDir, mapName);
+													 setMap(*this, mapsDir, mapName, opacity);
 										  }
 
 										  //delete event;
@@ -66,6 +68,7 @@ class MapLabel : public QLabel{
 
 		private:
 					 QDir mapsDir;
+					 double opacity;
 };
 
 //QLocalServer *server;
@@ -111,8 +114,101 @@ int main(int argc, char *argv[]){
 
 		  QApplication app(argc, argv);
 
+		  QString configPath = QDir::homePath() + "/.config/dbdoverlay/config.conf";
+
+		  double opacity = 0.7;
+		  int size = 300;
+		  int marginTop = 10;
+		  int marginBottom = 10;
+		  int marginRight = 10;
+		  int marginLeft = 10;
+		  bool anchorTop = true;
+		  bool anchorRight = true;
+		  bool anchorBottom = false;
+		  bool anchorLeft = false;
+
+		  QFile configFile(configPath);
+
+		  if (!configFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+					 qDebug() << "Could not open config:" << configPath;
+		  }else {
+					 QTextStream configStream(&configFile);
+
+					 while (!configStream.atEnd()) {
+								QString line = configStream.readLine();
+
+								QStringList parts = line.split("=");
+
+								if (parts.size() == 2){
+										  QString key = parts[0];
+										  QString value = parts[1];
+
+										  if (key == "opacity"){
+													 opacity = value.toDouble();
+										  }
+
+										  if (key == "size"){
+													 size = value.toInt();
+										  }
+
+										  if (key == "margin_top"){
+													 marginTop = value.toInt();
+										  }
+
+										  if (key == "margin_button"){
+													 marginBottom = value.toInt();
+										  }
+
+										  if (key == "margin_right"){
+													 marginRight = value.toInt();
+										  }
+
+										  if (key == "margin_left"){
+													 marginLeft = value.toInt();
+										  }
+
+										  if (key == "anchor_top") {
+													 if (value == "true"){
+																anchorTop = true;
+													 }
+													 else {
+																anchorTop = false;
+													 }
+										  }
+
+										  if (key == "anchor_bottom"){
+													if (value == "true"){
+															  anchorBottom = true;
+													}
+													else{
+															  anchorTop = false;
+													}
+										  }
+
+										  if (key == "anchor_left"){
+													 if (value == "true"){
+																anchorLeft = true;
+													 }
+													 else{
+																anchorLeft = false;
+													 }
+										  }
+										  
+										  if (key == "anchor_right"){
+													 if (value == "true"){
+																anchorRight = true;
+													 }
+													 else{
+																anchorRight = false;
+													 }
+										  }
+
+								}
+					 }
+		  }
+
 		  app.setApplicationName("dbdoverlay");
-		  app.setDesktopFileName("dbdoverlay");
+		  //app.setDesktopFileName("dbdoverlay");
 
 		  QWidget window;
 			
@@ -132,18 +228,31 @@ int main(int argc, char *argv[]){
 		  layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
 		  layerWindow->setExclusiveZone(0);
 
-		  layerWindow->setAnchors(
-								LayerShellQt::Window::Anchors(
-										  LayerShellQt::Window::AnchorTop |
-										  LayerShellQt::Window::AnchorRight 
-										  )
-								);
+		  LayerShellQt::Window::Anchors anchors;
 
-		  layerWindow->setMargins(QMargins(10, 10, 10, 10));
+		  if (anchorTop == true){
+					 anchors |= LayerShellQt::Window::AnchorTop;
+		  }
+
+		  if (anchorBottom == true){
+					 anchors |= LayerShellQt::Window::AnchorBottom;
+		  }
+
+		  if (anchorLeft == true){
+					 anchors |= LayerShellQt::Window::AnchorLeft;
+		  }
+
+		  if (anchorRight == true){
+					 anchors |= LayerShellQt::Window::AnchorRight;
+		  }
+
+		  layerWindow->setAnchors(anchors);
+
+		  layerWindow->setMargins(QMargins(marginLeft, marginTop, marginRight, marginBottom));
 
 		  QDir mapsDir(QDir::homePath() + "/.local/share/dbdoverlay/maps");
 
-		  MapLabel image(&window, mapsDir);
+		  MapLabel image(&window, mapsDir, opacity);
 
 		  int serverSocket = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -218,7 +327,7 @@ int main(int argc, char *argv[]){
 
 		  QString currentMap = "lakemine.png";
 
-		  if (!setMap(image, mapsDir, currentMap)){
+		  if (!setMap(image, mapsDir, currentMap, opacity)){
 					 return 1;
 		  }
 
@@ -268,9 +377,9 @@ int main(int argc, char *argv[]){
 
 
 		  image.setScaledContents(true);
-		  image.resize(300, 300);
+		  image.resize(size, size);
 
-		  window.resize(300, 300);
+		  window.resize(size, size);
 
 
 		  //QLocalServer *server = new QLocalServer(&app);
@@ -305,7 +414,7 @@ int main(int argc, char *argv[]){
 		  return result;
 }
 
-bool setMap(QLabel &image, const QDir &mapsDir, const QString &mapName){
+bool setMap(QLabel &image, const QDir &mapsDir, const QString &mapName, double opacity){
 		  QPixmap map(mapsDir.filePath(mapName));
 
 		  if (map.isNull()) {
@@ -316,7 +425,7 @@ bool setMap(QLabel &image, const QDir &mapsDir, const QString &mapName){
 		  transparentMap.fill(Qt::transparent);
 
 		  QPainter painter(&transparentMap);
-		  painter.setOpacity(0.7);
+		  painter.setOpacity(opacity);
 		  painter.drawPixmap(0, 0, map);
 		  painter.end();
 
