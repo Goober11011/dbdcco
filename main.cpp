@@ -14,6 +14,7 @@
 //#include <QLocalSocket>
 
 //#include <QDebug>
+#include <cerrno>
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -21,6 +22,7 @@
 #include <cstring>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <thread>
 #include <mutex>
@@ -99,7 +101,7 @@ int main(int argc, char *argv[]){
 					 }
 		  }
 
-		  if (argc == 3 && QString(argv[1]) == "--map") {
+		  if (argc == 3 && QString(argv[1]) == "-map") {
 					 int clientSocket = socket(AF_UNIX, SOCK_STREAM, 0);
 
 					 if (clientSocket == -1) {
@@ -134,7 +136,113 @@ int main(int argc, char *argv[]){
 					 return 0;
 		  }
 
+		  if (argc == 2 && QString(argv[1]) == "-status"){
+					 QFile pidFile(pidPath);
 
+					 if (!pidFile.open(QIODevice::ReadOnly | QIODevice::Text)){
+								qDebug() << "Overlay is not running.";
+								return 0;
+					 }
+
+					 QTextStream pidStream(&pidFile);
+					 QString pidText = pidStream.readAll();
+
+					 pid_t pid = pidText.toLongLong();
+
+					 if (kill(pid, 0) == 0){
+								qDebug() << "Overlay is running. PID:" << pid;
+					 } else{
+								qDebug() << "Overlay is not running.";
+					 }
+
+					 //if (kill(pid, 0) == 0){
+					 //			qDebug() << "Overlay is running. PID:" << pid;
+					 //}
+					 //else {
+					 //			qDebug() << "Overlay is not running.";
+					 //}
+					 
+					 return 0;
+		  }
+
+		  if (argc == 2 && QString(argv[1]) == "-stop"){
+					 QFile pidFile(pidPath);
+
+					 if (!pidFile.open(QIODevice::ReadOnly | QIODevice::Text)){
+								qDebug() << "Overlay is not running.";
+								return 0;
+					 }
+
+					 QTextStream pidStream(&pidFile);
+					 QString pidText = pidStream.readAll();
+
+					 pid_t pid = pidText.toLongLong();
+
+					 if (kill(pid, SIGTERM) == 0){
+								unlink(pidPath);
+								qDebug() << "Overlay stopped.";
+					 }
+					 else {
+								qDebug() << "Could not stop overlay.";
+								qDebug() << "Error:" << strerror(errno);
+					 }
+
+					 return 0;
+		  }
+
+		  if (argc == 2 && QString(argv[1]) == "-select"){
+					 QDir mapsDir(QDir::homePath() + "/.local/share/dbdoverlay/maps");
+
+					 QStringList mapFiles = mapsDir.entryList(
+										  QStringList() << "*.png",
+										  QDir::Files
+										  );
+
+					 qDebug() << "Available maps:";
+
+					 for (int i = 0; i < mapFiles.size(); i++){
+								qDebug() << i + 1 << "." << mapFiles[i];
+					 }
+
+					 qDebug() << "Select a map:";
+
+					 QTextStream input(stdin);
+					 QString choice = input.readLine();
+
+					 int selection = choice.toInt();
+
+					 if (selection >= 1 && selection <= mapFiles.size()){
+								QString mapName = mapFiles[selection - 1];
+
+								qDebug() << "Selected:" << mapName;
+
+								int clientSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+
+								if (clientSocket == -1){
+										  qDebug() << "Could not connect to overlay.";
+										  return 1;
+								}
+
+								sockaddr_un address{};
+								address.sun_family = AF_UNIX;
+
+								std::strncpy(address.sun_path, socketPath, sizeof(address.sun_path) - 1);
+
+								if (connect(clientSocket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == -1){
+										  close(clientSocket);
+										  qDebug() << "Could not connect to overlay.";
+										  return 1;
+								}
+
+								QByteArray mapData = mapName.toUtf8();
+
+								write(clientSocket, mapData.constData(), mapData.size());
+
+								close(clientSocket);
+					 }
+
+					 return 0;
+		  }
 
 		  QApplication app(argc, argv);
 
@@ -436,6 +544,7 @@ int main(int argc, char *argv[]){
 
 		  close(serverSocket);
 		  unlink(socketPath);
+		  unlink(pidPath);
 
 		  return result;
 }
