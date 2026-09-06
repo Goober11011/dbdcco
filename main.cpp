@@ -19,6 +19,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <cstring>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <thread>
 #include <mutex>
@@ -32,6 +34,7 @@ class MapChangeEvent : public QEvent{
 };
 
 const char *socketPath = "/tmp/dbdoverlay.sock";
+const char *pidPath = "/tmp/dbdoverlay.pid";
 
 std::string requestedMap;
 std::mutex mapMutex;
@@ -74,7 +77,28 @@ class MapLabel : public QLabel{
 //QLocalServer *server;
 
 int main(int argc, char *argv[]){
-		  //qDebug() << "App name:" << QCoreApplication::applicationName();
+		  
+		  if (argc == 1){
+					 pid_t pid = fork();
+					 
+					 if (pid > 0){
+								return 0;
+					 }
+
+					 if (pid == -1) {
+								return 1;
+					 }
+
+					 if (pid == 0){
+								QFile pidFile(pidPath);
+
+								if (pidFile.open(QIODevice::WriteOnly | QIODevice::Text)){
+										  QTextStream pidStream(&pidFile);
+										  pidStream << getpid();
+								}
+					 }
+		  }
+
 		  if (argc == 3 && QString(argv[1]) == "--map") {
 					 int clientSocket = socket(AF_UNIX, SOCK_STREAM, 0);
 

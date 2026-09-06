@@ -3,7 +3,6 @@
 mkdir -p "$HOME/.local/share/applications"
 mkdir -p "$HOME/.local/share/dbdoverlay"
 mkdir -p "$HOME/.local/bin"
-mkdir -p "$HOME/.config/dbdoverlay"
 
 cp dbdoverlay.desktop "$HOME/.local/share/applications/"
 cp dbdoverlay "$HOME/.local/bin/"
