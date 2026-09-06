@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=DBD Overlay
-Exec=[PathToExecutable]
+Exec=dbdoverlay
 Type=Application
 Terminal=false
 StartupWMClass=dbdoverlay
