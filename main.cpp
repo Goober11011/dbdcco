@@ -16,6 +16,7 @@
 //#include <QDebug>
 #include <cerrno>
 
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -23,6 +24,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
+#include <termios.h>
 
 #include <thread>
 #include <mutex>
@@ -204,15 +206,78 @@ int main(int argc, char *argv[]){
 								qDebug() << i + 1 << "." << mapFiles[i];
 					 }
 
-					 qDebug() << "Select a map:";
+					 qDebug() << "Select a map with the arrow keys. Press Enter to select.";
 
-					 QTextStream input(stdin);
-					 QString choice = input.readLine();
+					 int selection = 0;
 
-					 int selection = choice.toInt();
+					 struct termios oldSettings;
+					 struct termios newSettings;
 
-					 if (selection >= 1 && selection <= mapFiles.size()){
-								QString mapName = mapFiles[selection - 1];
+					 tcgetattr(STDIN_FILENO, &oldSettings);
+
+					 newSettings = oldSettings;
+					 newSettings.c_lflag &= ~(ICANON | ECHO);
+
+					 tcsetattr(STDIN_FILENO, TCSANOW, &newSettings);
+
+					 char key;
+
+					 while (true){
+								read(STDIN_FILENO, &key, 1);
+
+								if (key == '\n'){
+										  break;
+								}
+
+								if (key == 27){
+										  fd_set set;
+										  FD_ZERO(&set);
+										  FD_SET(STDIN_FILENO, &set);
+
+										  timeval timeout{};
+										  timeout.tv_sec = 0;
+										  timeout.tv_usec = 50000;
+
+										  int result = select(STDIN_FILENO + 1, &set, nullptr, nullptr, &timeout);
+
+										  if (result == 0){
+													 tcsetattr(STDIN_FILENO, TCSANOW, &oldSettings);
+
+													 qDebug() << "Selection cancelled.";
+
+													 return 0;
+										  }
+
+										  char sequence[2];
+
+										  read(STDIN_FILENO, &sequence[0], 1);
+										  read(STDIN_FILENO, &sequence[1], 1);
+
+										  if (sequence[0] == '['){
+													 if (sequence[1] == 'A'){
+																selection--;
+
+																if (selection < 0){
+																		  selection = mapFiles.size() - 1;
+																}
+													 }
+													 else if (sequence[1] == 'B'){
+																selection++;
+
+																if (selection >= mapFiles.size()) {
+																		  selection = 0;
+																}
+													 }
+										  }	
+								}
+
+								qDebug() << "Current selection:" << mapFiles[selection];
+					 }
+
+					 tcsetattr(STDIN_FILENO, TCSANOW, &oldSettings);
+
+					 if (selection >= 0 && selection <= mapFiles.size()){
+								QString mapName = mapFiles[selection];
 
 								qDebug() << "Selected:" << mapName;
 
@@ -239,6 +304,8 @@ int main(int argc, char *argv[]){
 								write(clientSocket, mapData.constData(), mapData.size());
 
 								close(clientSocket);
+
+								qDebug() << "Map sent to overlay.";
 					 }
 
 					 return 0;
