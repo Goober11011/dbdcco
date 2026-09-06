@@ -118,6 +118,7 @@ int main(int argc, char *argv[]){
 
 		  double opacity = 0.7;
 		  int size = 300;
+		  double sizey = 0;
 		  int marginTop = 10;
 		  int marginBottom = 10;
 		  int marginRight = 10;
@@ -149,6 +150,7 @@ int main(int argc, char *argv[]){
 
 										  if (key == "size"){
 													 size = value.toInt();
+													 sizey = static_cast<double>(size) * 1.1;
 										  }
 
 										  if (key == "margin_top"){
@@ -377,9 +379,9 @@ int main(int argc, char *argv[]){
 
 
 		  image.setScaledContents(true);
-		  image.resize(size, size);
+		  image.resize(size, sizey);
 
-		  window.resize(size, size);
+		  window.resize(size, sizey);
 
 
 		  //QLocalServer *server = new QLocalServer(&app);
